@@ -107,8 +107,8 @@ test("a legacy hidden S&P is not restored or pinned", () => {
 
 test("moving cards, including S&P, writes their exact order immediately", () => {
   const desk = new Desk();
-  desk.moveAsset("spx", "spcx");
-  desk.moveAsset("sui", "btc");
+  desk.moveAsset("spx", DEFAULT_ASSETS.at(-1).id);
+  desk.moveAsset("sui", DEFAULT_ASSETS[0].id);
   assert.equal(assetIds(loadDesk())[0], "sui");
   assert.equal(assetIds(loadDesk()).at(-1), "spx");
   assert.deepEqual(assetIds(new Desk()), assetIds(desk));
@@ -157,7 +157,7 @@ test("removing the focused asset moves focus and removes its alerts", () => {
   desk.setFocus("spx");
   desk.addRule("spx", "above", 7000);
   desk.removeAsset("spx");
-  assert.equal(loadDesk().focusId, "btc");
+  assert.equal(loadDesk().focusId, DEFAULT_ASSETS[0].id);
   assert.deepEqual(loadDesk().rules, []);
 });
 
