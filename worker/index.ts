@@ -23,7 +23,7 @@ function accessToken(request: Request) {
 // Cloudflare Access stops strangers before they reach the Worker. This second
 // check keeps /api closed if Access is ever switched off or misconfigured, so
 // nobody without a login can spend the quota. Any token signed by the team
-// passes, which is fine while Night Tape is the team's only Access app.
+// passes, which is fine while Lookout is the team's only Access app.
 // Returns why the request is refused, or null once it is signed in.
 async function refusal(request: Request, env: Env) {
   if (!env.ACCESS_TEAM) return "ACCESS_TEAM is not set in wrangler.jsonc.";
@@ -59,7 +59,7 @@ export default {
     try {
       const upstream = await fetch(target, {
         headers: hit.route.headers ?? {
-          "User-Agent": "night-tape",
+          "User-Agent": "lookout",
           Accept: "application/json",
         },
       });

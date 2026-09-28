@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "night-tape",
+  "name": "lookout",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-28",
   "assets": {
@@ -12,7 +12,7 @@
   },
   // `wrangler dev` acts as if Access signed you in.
   "access": {
-    "dev": { "aud": "night-tape-dev", "identity": { "email": "dev@localhost" } },
+    "dev": { "aud": "lookout-dev", "identity": { "email": "dev@localhost" } },
   },
   "vars": {
     // Your Zero Trust team name: the <team> in <team>.cloudflareaccess.com.

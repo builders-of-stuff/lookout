@@ -1,6 +1,6 @@
-# Night Tape
+# Lookout
 
-A local market desk for the names you already bounce between CoinMarketCap, DexScreener, and TradingView. SvelteKit 5, runs entirely in the browser.
+One page for the things you would otherwise check site by site: coin and stock prices, market mood, and the weather, with room for whatever comes next. SvelteKit 5 in the browser, plus a small Cloudflare Worker for the feeds once it is online.
 
 ```bash
 pnpm install
@@ -55,9 +55,9 @@ Paid upgrades only if you outgrow this: CMC Pro, Polygon / Twelve Data for stock
 
 1. Create a Cloudflare account and open **Zero Trust**. Pick a team name and the **Free** plan (it asks for a card; the free plan is not charged).
 2. Put the team name in `wrangler.jsonc` as `ACCESS_TEAM` (the `<team>` in `<team>.cloudflareaccess.com`).
-3. `pnpm exec wrangler login`, then `pnpm run deploy`. It prints the `https://night-tape.<you>.workers.dev` URL.
+3. `pnpm exec wrangler login`, then `pnpm run deploy`. It prints the `https://lookout.<you>.workers.dev` URL.
 4. Optional: `pnpm exec wrangler secret put WAQI_TOKEN` and paste the token.
-5. Dashboard → **Workers & Pages** → `night-tape` → **Access** → **Protect this Worker behind Access** → **All traffic**, allow your email, **Apply Access**.
+5. Dashboard → **Workers & Pages** → `lookout` → **Access** → **Protect this Worker behind Access** → **All traffic**, allow your email, **Apply Access**.
 6. Open the URL in a private window. You should get the Cloudflare login first, then the desk.
 
 To try the Worker build locally, `pnpm run preview:worker` (port 8787). The `access.dev` block in `wrangler.jsonc` makes `wrangler dev` act signed in. Put `WAQI_TOKEN=…` in `.dev.vars` for air quality there.

@@ -65,7 +65,7 @@ function notifyBrowser(event: AlertEvent) {
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
   try {
-    new Notification("Night Tape", { body: event.message });
+    new Notification("Lookout", { body: event.message });
   } catch {
     // Safari private / denied after the check.
   }

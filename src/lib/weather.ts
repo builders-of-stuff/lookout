@@ -13,6 +13,7 @@ import type {
   WeatherUnits,
 } from "./types";
 
+// Still the pre-rename Night Tape key, so saved settings carry over.
 export const WEATHER_KEY = "night-tape.weather.v1";
 export const WEATHER_POLL_MS = 10 * 60_000;
 /** How far back the hourly strip and the recap look. */

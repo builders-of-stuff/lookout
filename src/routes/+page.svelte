@@ -117,7 +117,7 @@
         >
       </div>
       <div>
-        <h1>Night Tape<span class="brand-period">.</span></h1>
+        <h1>Lookout<span class="brand-period">.</span></h1>
         <p>Your markets. Your rhythm.</p>
       </div>
     </div>
