@@ -12,6 +12,7 @@ import type {
   WeatherReport,
   WeatherUnits,
 } from "./types";
+import { trackedFetch } from "./feed-log.svelte";
 
 // Still the pre-rename Night Tape key, so saved settings carry over.
 export const WEATHER_KEY = "night-tape.weather.v1";
@@ -923,7 +924,7 @@ function bbox(place: WeatherPlace, latSpan: number, lonSpan: number) {
 }
 
 async function getJson(url: string, label: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const res = await trackedFetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`${label} ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { DEFAULT_ASSETS, tv } from "./assets";
+import { trackedFetch } from "./feed-log.svelte";
 import { COINGECKO_API } from "./quotes";
 import type { Asset } from "./types";
 
@@ -37,7 +38,7 @@ const TV_EXCHANGE: Record<string, string> = {
 };
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await trackedFetch(url);
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }

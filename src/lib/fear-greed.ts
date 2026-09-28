@@ -4,6 +4,7 @@ import type {
   FearGreedReading,
   FearGreedState,
 } from "./types";
+import { trackedFetch } from "./feed-log.svelte";
 
 export const BAND_LABEL: Record<FearGreedBand, string> = {
   "extreme-fear": "Extreme fear",
@@ -170,7 +171,7 @@ export function assembleFearGreed(
 }
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await trackedFetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.json();
 }

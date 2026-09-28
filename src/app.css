@@ -162,6 +162,10 @@ button:disabled {
   background: var(--color-positive);
   box-shadow: 0 0 8px #8bc9a32b;
 }
+.status-failing {
+  background: var(--color-negative);
+  box-shadow: 0 0 8px #e899982b;
+}
 .header-clock {
   width: 100%;
   padding-left: 13px;
@@ -2233,6 +2237,60 @@ button:disabled {
 .activity-panel time {
   color: var(--color-ghost);
   flex-shrink: 0;
+}
+.feeds-panel .quota {
+  margin-top: 16px;
+}
+.quota-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font: 11px var(--font-mono);
+}
+.quota-bar {
+  margin-top: 9px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ffffff0d;
+  overflow: hidden;
+}
+.quota-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-copper);
+}
+.quota-high span {
+  background: var(--color-stamp);
+}
+.feeds-panel .quota p {
+  margin-top: 9px;
+}
+.feed-list {
+  margin-top: 18px;
+  border-top: 1px solid #ffffff08;
+}
+.feeds-panel .feed-list li {
+  display: grid;
+  grid-template-columns: 5px minmax(0, 1fr) auto auto 3.5em;
+  align-items: center;
+  gap: 14px;
+  margin-top: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid #ffffff08;
+}
+.feed-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feed-route,
+.feeds-panel time {
+  color: var(--color-ghost);
+}
+.feed-status {
+  text-align: right;
 }
 .desk-footer {
   display: flex;

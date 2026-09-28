@@ -1,15 +1,18 @@
 <script lang="ts">
   import AssetCard from "$lib/components/asset-card.svelte";
+  import FeedsPanel from "$lib/components/feeds-panel.svelte";
   import FocusPane from "$lib/components/focus-pane.svelte";
   import MoodRail from "$lib/components/mood-rail.svelte";
   import SearchBar from "$lib/components/search-bar.svelte";
   import TickerTape from "$lib/components/ticker-tape.svelte";
   import WeatherRail from "$lib/components/weather-rail.svelte";
   import { desk } from "$lib/desk.svelte";
+  import { feedLog } from "$lib/feed-log.svelte";
+  import { quota } from "$lib/quota.svelte";
   import { station } from "$lib/weather-station.svelte";
   import { POLL_MS } from "$lib/assets";
   import { playTripChime, unlockChime } from "$lib/chime";
-  import { formatClock, formatTime, usSession } from "$lib/format";
+  import { formatClock, formatCompact, formatTime, usSession } from "$lib/format";
   import { onMount } from "svelte";
 
   let now = $state(Date.now());
@@ -17,6 +20,7 @@
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   );
   let logOpen = $state(false);
+  let feedsOpen = $state(false);
   let detailsOpen = $state(false);
   let arranging = $state(false);
   let draggingId = $state<string | null>(null);
@@ -39,6 +43,8 @@
   const declining = $derived(
     desk.assets.filter((a) => (desk.quotes[a.id]?.changePct ?? 0) < 0).length,
   );
+  const feedsSeen = $derived(Object.keys(feedLog).length > 0);
+  const feedsFailing = $derived(Object.values(feedLog).some((feed) => !feed.ok));
   const toasts = $derived(desk.events.filter((e) => now - e.at < 10_000).slice(0, 3));
 
   function openDetails(id: string) {
@@ -57,6 +63,7 @@
   onMount(() => {
     desk.start();
     station.start();
+    quota.start();
     const unlock = () => unlockChime();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeDetails();
@@ -67,6 +74,7 @@
     return () => {
       desk.stop();
       station.stop();
+      quota.stop();
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", onKey);
       clearInterval(id);
@@ -112,9 +120,7 @@
   <header class="desk-header">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none"
-          ><path d="M5 23V9l11 14V9M21 9h7M24.5 9v14" /></svg
-        >
+        <svg viewBox="0 0 32 32" fill="none"><path d="M11 8v16h11" /></svg>
       </div>
       <div>
         <h1>Lookout<span class="brand-period">.</span></h1>
@@ -136,6 +142,21 @@
             Enable alerts
           </button>
         {/if}
+        <button
+          type="button"
+          class="quiet-button"
+          class:button-selected={feedsOpen}
+          aria-expanded={feedsOpen}
+          aria-controls="feeds-panel"
+          onclick={() => (feedsOpen = !feedsOpen)}
+        >
+          <span
+            class="status-dot"
+            class:status-open={feedsSeen && !feedsFailing}
+            class:status-failing={feedsFailing}
+          ></span>
+          Feeds
+        </button>
         <button
           type="button"
           class="quiet-button"
@@ -331,6 +352,10 @@
       </section>
     {/if}
 
+    {#if feedsOpen}
+      <FeedsPanel {now} />
+    {/if}
+
     <footer class="desk-footer">
       <span
         ><span class="status-dot" class:status-open={desk.status === "live"}></span>
@@ -342,6 +367,11 @@
               ? "Connecting"
               : "Ready when you are"}
         <span class="footer-divider">/</span> Refreshes every {POLL_MS / 1000}s
+        {#if quota.report}
+          <span class="footer-divider">/</span>
+          {formatCompact(quota.report.used)} of {formatCompact(quota.report.limit)} Worker
+          requests today
+        {/if}
       </span>
       <span
         >{desk.updatedAt

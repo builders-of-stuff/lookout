@@ -1,11 +1,15 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { matchApi, upstreamPath } from "./api-routes.ts";
+import { quotaResponse } from "./quota.ts";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   // Zero Trust team name: the <team> in <team>.cloudflareaccess.com.
   ACCESS_TEAM?: string;
   WAQI_TOKEN?: string;
+  // For the usage meter; see worker/quota.ts.
+  ANALYTICS_TOKEN?: string;
+  ANALYTICS_ACCOUNT_ID?: string;
 }
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
@@ -48,6 +52,9 @@ export default {
 
     const refused = ctx.access ? null : await refusal(request, env);
     if (refused) return new Response(refused, { status: 403 });
+    if (url.pathname === "/api/quota") {
+      return quotaResponse(env.ANALYTICS_TOKEN, env.ANALYTICS_ACCOUNT_ID);
+    }
     const hit = matchApi(url.pathname + url.search);
     if (!hit) return new Response("Unknown feed", { status: 404 });
     if (request.method !== "GET") return new Response("GET only", { status: 405 });

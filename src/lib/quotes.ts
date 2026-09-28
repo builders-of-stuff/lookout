@@ -1,3 +1,4 @@
+import { trackedFetch } from "./feed-log.svelte";
 import type { Asset, Quote, Tick } from "./types";
 
 // Called straight from the browser (CoinGecko sends CORS headers). Through the
@@ -26,7 +27,7 @@ function money(v: unknown): number | undefined {
 }
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await trackedFetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.json();
 }

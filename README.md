@@ -62,6 +62,8 @@ Paid upgrades only if you outgrow this: CMC Pro, Polygon / Twelve Data for stock
 
 To try the Worker build locally, `pnpm run preview:worker` (port 8787). The `access.dev` block in `wrangler.jsonc` makes `wrangler dev` act signed in. Put `WAQI_TOKEN=…` in `.dev.vars` for air quality there.
 
+**Feeds** in the header lists each feed's last call from this tab, whether it went through the Worker or direct, and its status. It also shows today's Worker requests against the free plan's 100,000 (per account, reset at midnight UTC). The usage meter needs a Cloudflare API token with **Account → Account Analytics → Read**: put `ANALYTICS_TOKEN=…` and `ANALYTICS_ACCOUNT_ID=…` in `.env.local` for `pnpm dev`, and store both online with `pnpm exec wrangler secret put ANALYTICS_TOKEN` and `… ANALYTICS_ACCOUNT_ID`.
+
 Free-plan budget: 100,000 Worker requests a day. The default desk makes 2 per 20-second poll (CoinGecko goes direct), so roughly 8,600 for a tab left visible all day.
 
 ## Weather
