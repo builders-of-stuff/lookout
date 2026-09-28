@@ -20,14 +20,12 @@
     {@const quote = quotes[asset.id]}
     {@const up = (quote?.changePct ?? 0) >= 0}
     {@const fresh = now - (flashed[asset.id] ?? 0) < 2800}
-    <span
-      class="mx-6 inline-flex items-baseline gap-3 font-mono text-[13px] tracking-wide"
-    >
+    <span class="mx-5 inline-flex items-baseline gap-2.5 font-mono text-[11px]">
       <span class="text-ghost">{asset.symbol}</span>
       <span class={cx("tabular text-paper", fresh && "print-fresh")}>
         {quote ? `$${formatPrice(quote.price)}` : "—"}
       </span>
-      <span class={cx("tabular", up ? "text-copper" : "text-frost")}>
+      <span class={cx("tabular", up ? "positive" : "negative")}>
         {quote ? formatPct(quote.changePct) : ""}
       </span>
     </span>
@@ -36,10 +34,10 @@
 
 <div class="tape-rail relative overflow-hidden border-y border-rule">
   <div
-    class="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#14110d] to-transparent"
+    class="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-ink to-transparent"
   ></div>
   <div
-    class="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#14110d] to-transparent"
+    class="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-ink to-transparent"
   ></div>
   <div class="tape-track whitespace-nowrap py-2.5 pl-10 pr-10">
     <div class="flex items-center">{@render prints("a")}</div>

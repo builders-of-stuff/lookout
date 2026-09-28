@@ -1,9 +1,12 @@
 <script lang="ts">
   import AssetCard from "$lib/components/asset-card.svelte";
   import FocusPane from "$lib/components/focus-pane.svelte";
+  import MoodRail from "$lib/components/mood-rail.svelte";
   import SearchBar from "$lib/components/search-bar.svelte";
   import TickerTape from "$lib/components/ticker-tape.svelte";
+  import WeatherRail from "$lib/components/weather-rail.svelte";
   import { desk } from "$lib/desk.svelte";
+  import { station } from "$lib/weather-station.svelte";
   import { POLL_MS } from "$lib/assets";
   import { playTripChime, unlockChime } from "$lib/chime";
   import { formatClock, formatTime, usSession } from "$lib/format";
@@ -14,23 +17,58 @@
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   );
   let logOpen = $state(false);
+  let detailsOpen = $state(false);
+  let arranging = $state(false);
   let draggingId = $state<string | null>(null);
   let overId = $state<string | null>(null);
+  let announcement = $state("");
 
   const focus = $derived(
     desk.assets.find((a) => a.id === desk.focusId) ?? desk.assets[0],
   );
   const session = $derived(usSession(now));
+  const sessionNames = {
+    pre: "US pre-market",
+    rth: "US market open",
+    ah: "US after hours",
+    closed: "US market closed",
+  };
+  const advancing = $derived(
+    desk.assets.filter((a) => (desk.quotes[a.id]?.changePct ?? 0) > 0).length,
+  );
+  const declining = $derived(
+    desk.assets.filter((a) => (desk.quotes[a.id]?.changePct ?? 0) < 0).length,
+  );
   const toasts = $derived(desk.events.filter((e) => now - e.at < 10_000).slice(0, 3));
+
+  function openDetails(id: string) {
+    if (detailsOpen && desk.focusId === id) {
+      detailsOpen = false;
+      return;
+    }
+    desk.setFocus(id);
+    detailsOpen = true;
+  }
+
+  function closeDetails() {
+    detailsOpen = false;
+  }
 
   onMount(() => {
     desk.start();
+    station.start();
     const unlock = () => unlockChime();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeDetails();
+    };
     window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", onKey);
     const id = setInterval(() => (now = Date.now()), 1000);
     return () => {
       desk.stop();
+      station.stop();
       window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", onKey);
       clearInterval(id);
     };
   });
@@ -42,6 +80,12 @@
     notify = await Notification.requestPermission();
   }
 
+  function move(from: string, to: string) {
+    desk.moveAsset(from, to);
+    const position = desk.assets.findIndex((asset) => asset.id === from);
+    announcement = `${desk.assets[position]?.symbol} moved to position ${position + 1}.`;
+  }
+
   function dragStart(e: DragEvent, id: string) {
     draggingId = id;
     e.dataTransfer?.setData("text/plain", id);
@@ -49,6 +93,7 @@
   }
 
   function dragOver(e: DragEvent, id: string) {
+    if (!draggingId) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     overId = id;
@@ -57,93 +102,175 @@
   function drop(e: DragEvent, id: string) {
     e.preventDefault();
     const from = e.dataTransfer?.getData("text/plain") || draggingId;
-    if (from) desk.moveAsset(from, id);
+    if (from) move(from, id);
     draggingId = null;
     overId = null;
   }
 </script>
 
-{#if focus}
-  <div class="flex min-h-svh flex-col bg-ink text-paper">
-    <header class="flex flex-wrap items-end justify-between gap-3 px-5 py-4">
-      <div>
-        <div class="font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
-          local desk
-        </div>
-        <h1
-          class="font-display text-[28px] font-extrabold leading-none tracking-[0.18em]"
+<div class="desk-shell">
+  <header class="desk-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"
+          ><path d="M5 23V9l11 14V9M21 9h7M24.5 9v14" /></svg
         >
-          NIGHT TAPE
-        </h1>
       </div>
-      <div
-        class="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[11px] text-ghost"
-      >
-        <span class="tabular text-paper">{formatClock(now)}</span>
-        <span>US {session}</span>
-        <span>
-          {#if desk.status === "live"}
-            live · {desk.updatedAt ? formatTime(desk.updatedAt) : "polling"}
-          {:else if desk.status === "error"}
-            feed error
-          {:else}
-            warming
-          {/if}
-        </span>
-        <span>{POLL_MS / 1000}s poll</span>
+      <div>
+        <h1>Night Tape<span class="brand-period">.</span></h1>
+        <p>Your markets. Your rhythm.</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="market-status">
+        <span class="status-dot" class:status-open={session === "rth"}></span>
+        <span>{sessionNames[session]}</span>
+        <span class="header-clock tabular">{formatClock(now)}</span>
+      </div>
+      <div class="header-actions">
         {#if notify !== "granted" && notify !== "unsupported"}
-          <button type="button" class="text-lamp hover:underline" onclick={enableNotes}>
+          <button type="button" class="quiet-button" onclick={enableNotes}>
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"
+              ><path d="M15 7a5 5 0 0 0-10 0c0 6-2 6-2 7h14c0-1-2-1-2-7ZM8 17h4" /></svg
+            >
             Enable alerts
           </button>
         {/if}
         <button
           type="button"
-          class="text-paper hover:text-lamp"
+          class="quiet-button"
+          class:button-selected={logOpen}
+          aria-expanded={logOpen}
+          aria-controls="trip-log"
           onclick={() => (logOpen = !logOpen)}
         >
-          trips {desk.events.length}
+          Activity <span class="count-badge">{desk.events.length}</span>
         </button>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <SearchBar
-      assets={desk.assets}
-      onAdd={(asset) => void desk.addAsset(asset)}
-      onFocus={(id) => desk.setFocus(id)}
-    />
-
+  {#if desk.assets.length}
     <TickerTape
       assets={desk.assets}
       quotes={desk.quotes}
       flashed={desk.flashed}
       {now}
     />
+  {/if}
 
-    {#if desk.errors.length > 0}
-      <div class="border-b border-rule px-5 py-1.5 font-mono text-[11px] text-stamp">
-        {desk.errors[0]}
+  <div class="workspace">
+    <MoodRail mood={desk.mood} />
+    <WeatherRail {station} {now} />
+
+    <div class="workspace-toolbar">
+      <div>
+        <div class="eyebrow">THE OVERVIEW</div>
+        <div class="watchlist-title">
+          <h2>Your watchlist</h2>
+          <span class="asset-count tabular"
+            >{String(desk.assets.length).padStart(2, "0")}</span
+          >
+        </div>
+        <div class="watchlist-subtitle">
+          <span class="positive">↗ {advancing} advancing</span>
+          <span class="negative">↘ {declining} declining</span>
+        </div>
       </div>
+      <div class="watchlist-actions">
+        <SearchBar
+          assets={desk.assets}
+          onAdd={(asset) => {
+            void desk.addAsset(asset).then((id) => {
+              detailsOpen = true;
+              desk.setFocus(id);
+            });
+          }}
+          onFocus={openDetails}
+        />
+      </div>
+    </div>
+
+    <div class="desk-meta">
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="arrange-button"
+          class:button-selected={arranging}
+          aria-pressed={arranging}
+          onclick={() => (arranging = !arranging)}
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"
+            ><rect x="2" y="2" width="4" height="4" rx="1" /><rect
+              x="10"
+              y="2"
+              width="4"
+              height="4"
+              rx="1"
+            /><rect x="2" y="10" width="4" height="4" rx="1" /><rect
+              x="10"
+              y="10"
+              width="4"
+              height="4"
+              rx="1"
+            /></svg
+          >
+          {arranging ? "Done arranging" : "Arrange"}
+        </button>
+        <span class="arrange-hint"
+          >{arranging
+            ? "Drag cards or use the arrows below."
+            : "Drag to make it yours."}</span
+        >
+      </div>
+      <span class="save-status" class:save-failed={desk.saved === false} role="status">
+        {#if desk.saved === false}
+          Changes couldn’t be saved in this browser
+        {:else if desk.saved}
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"
+            ><path d="m3 8 3 3 7-7" /></svg
+          >
+          Saved to this browser
+        {/if}
+      </span>
+    </div>
+
+    {#if desk.errors.length > 0 && desk.assets.length}
+      <details class="feed-notice">
+        <summary
+          >Some prices couldn’t refresh. Retrying every {POLL_MS / 1000}s.</summary
+        >
+        <p>{desk.errors.join(" · ")}</p>
+      </details>
     {/if}
 
     <main
-      class="grid flex-1 items-start gap-4 p-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.9fr)]"
+      class="desk-grid"
+      class:with-details={detailsOpen && !!focus}
+      class:desk-empty={!desk.assets.length}
     >
-      <section
-        class="grid grid-cols-1 content-start gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        {#each desk.assets as asset (asset.id)}
+      <section class="watchlist-grid" aria-label="Watchlist">
+        {#each desk.assets as asset, index (asset.id)}
           <AssetCard
             {asset}
             quote={desk.quotes[asset.id]}
             ticks={desk.ticks[asset.id] ?? []}
-            active={focus.id === asset.id}
+            active={detailsOpen && focus?.id === asset.id}
             fresh={now - (desk.flashed[asset.id] ?? 0) < 2800}
             dragging={draggingId === asset.id}
             over={overId === asset.id && draggingId !== asset.id}
-            onFocus={() => desk.setFocus(asset.id)}
-            onRemove={desk.assets.length > 1 && asset.id !== "spx"
-              ? () => desk.removeAsset(asset.id)
-              : undefined}
+            {arranging}
+            position={index}
+            total={desk.assets.length}
+            onFocus={() => openDetails(asset.id)}
+            onRemove={() => {
+              desk.removeAsset(asset.id);
+              if (!desk.assets.length) detailsOpen = false;
+            }}
+            onMove={(offset) => {
+              const target = desk.assets[index + offset];
+              if (target) move(asset.id, target.id);
+            }}
             onDragStart={(e) => dragStart(e, asset.id)}
             onDragOver={(e) => dragOver(e, asset.id)}
             onDrop={(e) => drop(e, asset.id)}
@@ -152,56 +279,82 @@
               overId = null;
             }}
           />
+        {:else}
+          <div class="empty-watchlist">
+            <div class="empty-mark" aria-hidden="true">＋</div>
+            <div class="eyebrow">A CLEAN SLATE</div>
+            <h3>Make room for your next move.</h3>
+            <p>Search for a coin, stock, or fund to build your watchlist.</p>
+            <button
+              type="button"
+              class="primary-button"
+              onclick={() => document.getElementById("tape-add")?.focus()}
+              >Add your first asset <span aria-hidden="true">↗</span></button
+            >
+          </div>
         {/each}
       </section>
-      <FocusPane
-        asset={focus}
-        quote={desk.quotes[focus.id]}
-        ticks={desk.ticks[focus.id] ?? []}
-        rules={desk.rules}
-        onAddRule={(kind, value) => desk.addRule(focus.id, kind, value)}
-        onRemoveRule={(id) => desk.removeRule(id)}
-        onDrop={desk.assets.length > 1 && focus.id !== "spx"
-          ? () => desk.removeAsset(focus.id)
-          : undefined}
-      />
+      {#if detailsOpen && focus}
+        <FocusPane
+          asset={focus}
+          quote={desk.quotes[focus.id]}
+          ticks={desk.ticks[focus.id] ?? []}
+          rules={desk.rules}
+          onAddRule={(kind, value) => desk.addRule(focus.id, kind, value)}
+          onRemoveRule={(id) => desk.removeRule(id)}
+          onDrop={() => {
+            desk.removeAsset(focus.id);
+            if (!desk.assets.length) detailsOpen = false;
+          }}
+          onClose={closeDetails}
+        />
+      {/if}
     </main>
 
     {#if logOpen}
-      <section class="border-t border-rule bg-blotter px-5 py-3">
-        <div
-          class="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.22em] text-ghost"
-        >
-          <span>Trip log</span>
-          <button type="button" class="text-stamp" onclick={() => desk.clearEvents()}>
-            clear
-          </button>
+      <section id="trip-log" class="activity-panel">
+        <div class="flex items-center justify-between gap-3">
+          <h2>Alert activity</h2>
+          <button type="button" class="quiet-button" onclick={() => desk.clearEvents()}
+            >Clear activity</button
+          >
         </div>
         {#if desk.events.length === 0}
-          <p class="text-sm text-ghost">Quiet. Nothing has tripped yet.</p>
+          <p>All quiet. Triggered price alerts will appear here.</p>
         {:else}
-          <ul class="space-y-1 font-mono text-xs">
+          <ul>
             {#each desk.events.slice(0, 12) as event (event.id)}
-              <li class="flex gap-3">
-                <span class="text-ghost">{formatTime(event.at)}</span>
-                <span>{event.message}</span>
-              </li>
+              <li><time>{formatTime(event.at)}</time><span>{event.message}</span></li>
             {/each}
           </ul>
         {/if}
       </section>
     {/if}
 
-    <div
-      class="pointer-events-none fixed top-20 right-4 z-20 flex w-[min(100%-2rem,360px)] flex-col gap-2"
-    >
-      {#each toasts as event (event.id)}
-        <div
-          class="pointer-events-auto border border-lamp bg-panel px-3 py-2 font-mono text-xs text-lamp shadow-[0_0_24px_rgba(255,224,138,0.16)]"
-        >
-          {event.message}
-        </div>
-      {/each}
-    </div>
+    <footer class="desk-footer">
+      <span
+        ><span class="status-dot" class:status-open={desk.status === "live"}></span>
+        {desk.status === "live"
+          ? "Connected"
+          : desk.status === "error"
+            ? "Reconnecting"
+            : desk.assets.length
+              ? "Connecting"
+              : "Ready when you are"}
+        <span class="footer-divider">/</span> Refreshes every {POLL_MS / 1000}s
+      </span>
+      <span
+        >{desk.updatedAt
+          ? `Last update ${formatTime(desk.updatedAt)}`
+          : "A little signal. A lot less noise."}</span
+      >
+    </footer>
   </div>
-{/if}
+
+  <span class="sr-only" aria-live="polite">{announcement}</span>
+  <div class="toast-stack" aria-live="polite">
+    {#each toasts as event (event.id)}<div class="alert-toast">
+        {event.message}
+      </div>{/each}
+  </div>
+</div>

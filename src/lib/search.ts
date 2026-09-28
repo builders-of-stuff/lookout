@@ -1,4 +1,5 @@
 import { DEFAULT_ASSETS, tv } from "./assets";
+import { COINGECKO_API } from "./quotes";
 import type { Asset } from "./types";
 
 export type SearchGroup = "coin" | "dex" | "stock";
@@ -168,7 +169,7 @@ function tickerFallback(raw: string): SearchHit {
 
 async function searchCoins(query: string): Promise<SearchHit[]> {
   const data = (await getJson(
-    `/api/coingecko/search?query=${encodeURIComponent(query)}`,
+    `${COINGECKO_API}/search?query=${encodeURIComponent(query)}`,
   )) as { coins?: Array<Record<string, unknown>> };
   return (data.coins ?? [])
     .slice(0, 6)

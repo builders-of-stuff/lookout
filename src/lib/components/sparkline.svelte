@@ -25,14 +25,17 @@
   <svg
     viewBox="0 0 100 36"
     preserveAspectRatio="none"
-    class={cx("h-9 w-full", className)}
+    class={cx("h-11 w-full", up ? "positive" : "negative", className)}
     aria-hidden="true"
   >
+    <path d={`${d} L100 40 L0 40 Z`} fill="currentColor" opacity="0.06" />
     <path
       {d}
       fill="none"
-      stroke={up ? "#d08a4a" : "#8ec8ff"}
+      stroke="currentColor"
       stroke-width="1.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
       vector-effect="non-scaling-stroke"
     />
   </svg>

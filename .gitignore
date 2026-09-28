@@ -24,3 +24,7 @@ build
 *.njsproj
 *.sln
 *.sw?
+
+# Cloudflare Worker
+.wrangler
+.dev.vars*

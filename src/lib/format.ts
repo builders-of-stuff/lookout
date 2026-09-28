@@ -83,3 +83,15 @@ export function kindLabel(kind: AssetKind): string {
   if (kind === "equity") return "equity";
   return "index";
 }
+
+export function shortenAddress(address: string, head = 4, tail = 4): string {
+  const value = address.trim();
+  if (value.length <= head + tail + 1) return value;
+  return `${value.slice(0, head)}…${value.slice(-tail)}`;
+}
+
+export function tokenFieldLabel(chain?: string): string {
+  if (chain === "solana") return "Mint";
+  if (chain) return "Contract";
+  return "Token";
+}

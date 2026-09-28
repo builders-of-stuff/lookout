@@ -36,11 +36,14 @@
   const groupOrder = $derived<SearchGroup[]>(
     isTickerQuery(query) ? ["stock", "coin", "dex"] : ["coin", "dex", "stock"],
   );
+  const orderedHits = $derived(
+    groupOrder.flatMap((group) => hits.filter((hit) => hit.group === group)),
+  );
   const groups = $derived(
     groupOrder
       .map((group) => ({
         group,
-        rows: hits
+        rows: orderedHits
           .map((hit, index) => ({ hit, index }))
           .filter((row) => row.hit.group === group),
       }))
@@ -55,23 +58,31 @@
       error = null;
       return;
     }
+    let cancelled = false;
     loading = true;
+    hits = [];
+    error = null;
     const handle = window.setTimeout(() => {
       void searchMarkets(q)
         .then((rows) => {
+          if (cancelled) return;
           hits = rows;
           active = 0;
           error = rows.length ? null : "Nothing matched.";
         })
         .catch(() => {
+          if (cancelled) return;
           hits = [];
           error = "Search failed. Try again in a moment.";
         })
         .finally(() => {
-          loading = false;
+          if (!cancelled) loading = false;
         });
     }, 280);
-    return () => window.clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   });
 
   $effect(() => {
@@ -112,14 +123,19 @@
     if (!hits.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      active = (active + 1) % hits.length;
+      active = (active + 1) % orderedHits.length;
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      active = (active - 1 + hits.length) % hits.length;
+      active = (active - 1 + orderedHits.length) % orderedHits.length;
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const hit = hits[active];
+      const hit = orderedHits[active];
       if (hit) pick(hit);
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      document
+        .getElementById(`search-hit-${active}`)
+        ?.scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -135,13 +151,11 @@
   }
 </script>
 
-<div bind:this={box} class="relative px-5 pb-3">
-  <label class="sr-only" for="tape-add">Add a name</label>
-  <div
-    class="flex items-center gap-3 border border-rule bg-blotter px-3 py-2 focus-within:border-copper"
-  >
-    <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-copper"
-      >add</span
+<div bind:this={box} class="search-box">
+  <label class="sr-only" for="tape-add">Search coins and stocks</label>
+  <div class="search-field">
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"
+      ><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg
     >
     <input
       id="tape-add"
@@ -150,18 +164,22 @@
       oninput={() => (open = true)}
       onfocus={() => (open = true)}
       onkeydown={onKeys}
-      placeholder="Search coins, tickers, or a mint — / to focus"
-      class="w-full bg-transparent font-mono text-sm text-paper outline-none placeholder:text-ghost"
+      placeholder="Add a coin, stock, or fund…"
+      class="search-input"
       autocomplete="off"
       spellcheck="false"
       role="combobox"
-      aria-expanded={open}
+      aria-expanded={open && Boolean(query.trim())}
       aria-controls="tape-add-list"
+      aria-autocomplete="list"
+      aria-activedescendant={open && hits.length ? `search-hit-${active}` : undefined}
     />
     {#if loading}
       <span class="font-mono text-[10px] uppercase tracking-wider text-ghost">
-        hunting
+        Searching…
       </span>
+    {:else}
+      <kbd class="search-shortcut">/</kbd>
     {/if}
   </div>
 
@@ -169,15 +187,19 @@
     <div
       id="tape-add-list"
       role="listbox"
-      class="absolute right-5 left-5 z-30 mt-1 max-h-[min(60vh,420px)] overflow-auto border border-rule bg-panel shadow-[0_16px_40px_rgba(0,0,0,0.45)]"
+      aria-label="Search results"
+      class="search-results"
     >
+      {#if loading}
+        <p class="px-4 py-4 text-xs text-ghost" role="status">Searching the markets…</p>
+      {/if}
       {#if error && !hits.length}
         <p class="px-3 py-3 font-mono text-xs text-ghost">{error}</p>
       {/if}
       {#each groups as { group, rows } (group)}
         <div>
           <div
-            class="sticky top-0 bg-panel px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-copper"
+            class="sticky top-0 bg-panel px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-copper"
           >
             {LABELS[group]}
           </div>
@@ -185,9 +207,10 @@
             {@const onDesk = Boolean(findOnDesk(hit.asset, assets))}
             <button
               type="button"
+              id="search-hit-{index}"
               role="option"
               aria-selected={index === active}
-              class="flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left {index ===
+              class="search-result flex w-full items-baseline justify-between gap-3 px-4 py-3 text-left {index ===
               active
                 ? 'bg-blotter'
                 : ''}"
@@ -199,11 +222,12 @@
                   {hit.asset.symbol}
                 </span>
                 <span class="ml-2 text-sm text-ghost">{hit.asset.name}</span>
+                <span class="search-result-detail">{hit.detail}</span>
               </span>
               <span
                 class="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ghost"
               >
-                {onDesk ? "on tape" : hit.detail}
+                {onDesk ? "✓ Added" : "+ Add"}
               </span>
             </button>
           {/each}

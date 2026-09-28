@@ -1,4 +1,4 @@
-import { DEFAULT_ASSETS, PINNED_IDS } from "./assets";
+import { DEFAULT_ASSETS } from "./assets";
 import type { Asset } from "./types";
 
 function spxLike(asset: Asset): boolean {
@@ -43,15 +43,18 @@ export function findOnDesk(asset: Asset, desk: Asset[]): Asset | undefined {
   return desk.find((row) => sameAsset(row, asset));
 }
 
+/** Migrate the original defaults + exclusions format without changing user choices. */
 export function composeWatchlist(
   custom: Asset[],
   hiddenIds: string[],
   order: string[] = [],
 ): Asset[] {
-  const hidden = new Set([...hiddenIds].filter((id) => !PINNED_IDS.has(id)));
+  const hidden = new Set(hiddenIds);
   const defaults = DEFAULT_ASSETS.filter((a) => !hidden.has(a.id));
-  const extras = custom.filter((row) => !defaults.some((d) => sameAsset(d, row)));
-  const list = [...defaults, ...extras];
+  const list = [...defaults];
+  for (const asset of custom) {
+    if (!hidden.has(asset.id) && !findOnDesk(asset, list)) list.push(asset);
+  }
   if (!order.length) return list;
   const byId = new Map(list.map((a) => [a.id, a]));
   const seen = new Set<string>();

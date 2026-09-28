@@ -35,17 +35,17 @@
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#8b93a7",
+        textColor: "#939e9b",
         fontFamily: "Azeret Mono, ui-monospace, monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(42,49,72,0.45)" },
-        horzLines: { color: "rgba(42,49,72,0.45)" },
+        vertLines: { color: "rgba(42,49,53,0.45)" },
+        horzLines: { color: "rgba(42,49,53,0.45)" },
       },
-      rightPriceScale: { borderColor: "#2a3148" },
+      rightPriceScale: { borderColor: "#2a3135" },
       timeScale: {
-        borderColor: "#2a3148",
+        borderColor: "#2a3135",
         timeVisible: true,
         secondsVisible: false,
       },
@@ -55,8 +55,8 @@
     });
     series = chart.addSeries(AreaSeries, {
       lineWidth: 2,
-      lineColor: "#d08a4a",
-      topColor: "rgba(208,138,74,0.28)",
+      lineColor: "#8bc9a3",
+      topColor: "rgba(139,201,163,0.16)",
       bottomColor: "rgba(10,12,20,0)",
       priceLineVisible: true,
     });
@@ -72,8 +72,8 @@
     const c = chart;
     if (!s || !c) return;
     s.applyOptions({
-      lineColor: up ? "#d08a4a" : "#8ec8ff",
-      topColor: up ? "rgba(208,138,74,0.28)" : "rgba(142,200,255,0.22)",
+      lineColor: up ? "#8bc9a3" : "#e89998",
+      topColor: up ? "rgba(139,201,163,0.16)" : "rgba(232,153,152,0.16)",
     });
     c.timeScale().applyOptions({ secondsVisible: range === "1H" });
     const cutoff = Date.now() - WINDOW[range];

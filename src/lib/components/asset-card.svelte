@@ -1,11 +1,13 @@
 <script lang="ts">
+  import AssetMark from "$lib/components/asset-mark.svelte";
   import Sparkline from "$lib/components/sparkline.svelte";
+  import { copyText } from "$lib/clipboard";
   import {
     formatCompact,
     formatPct,
     formatPrice,
     kindLabel,
-    sessionLabel,
+    shortenAddress,
   } from "$lib/format";
   import type { Asset, Quote, Tick } from "$lib/types";
 
@@ -17,8 +19,12 @@
     fresh,
     dragging,
     over,
+    arranging,
+    position,
+    total,
     onFocus,
     onRemove,
+    onMove,
     onDragStart,
     onDragOver,
     onDrop,
@@ -31,8 +37,12 @@
     fresh: boolean;
     dragging: boolean;
     over: boolean;
+    arranging: boolean;
+    position: number;
+    total: number;
     onFocus: () => void;
-    onRemove?: () => void;
+    onRemove: () => void;
+    onMove: (offset: number) => void;
     onDragStart: (e: DragEvent) => void;
     onDragOver: (e: DragEvent) => void;
     onDrop: (e: DragEvent) => void;
@@ -41,145 +51,169 @@
 
   const up = $derived((quote?.changePct ?? 0) >= 0);
   const spark = $derived(ticks.slice(-80).map((t) => t.p));
-  const windows = $derived(quote?.windows);
   let dragged = false;
+  let copied = $state(false);
+  let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function click() {
-    if (dragged) {
-      dragged = false;
-      return;
-    }
-    onFocus();
+  async function copyToken(event: MouseEvent) {
+    event.stopPropagation();
+    const address = asset.tokenAddress;
+    if (!address) return;
+    copied = await copyText(address);
+    if (copyTimer) clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      copied = false;
+    }, 1600);
   }
 </script>
 
 <div
-  class="bay relative flex h-full w-full flex-col {active ? 'bay-live' : ''} {dragging
-    ? 'bay-dragging'
-    : ''} {over ? 'bay-over' : ''}"
+  class="bay"
+  class:bay-live={active}
+  class:bay-dragging={dragging}
+  class:bay-over={over}
   role="group"
   aria-label="{asset.symbol} {asset.name}"
+  data-asset-id={asset.id}
   draggable="true"
-  ondragstart={(e) => {
+  ondragstart={(event) => {
     dragged = true;
-    onDragStart(e);
+    onDragStart(event);
   }}
   ondragover={onDragOver}
   ondrop={onDrop}
-  ondragend={onDragEnd}
+  ondragend={() => {
+    onDragEnd();
+    requestAnimationFrame(() => {
+      dragged = false;
+    });
+  }}
 >
-  <div
-    class="pointer-events-none absolute left-2 top-2 z-10 font-mono text-[10px] leading-none tracking-widest text-ghost"
-    aria-hidden="true"
-  >
-    ⋮⋮
-  </div>
-  {#if onRemove}
+  <div class="card-tools">
+    <span class="drag-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
+    {#if asset.tokenAddress}
+      <button
+        type="button"
+        class="icon-button"
+        class:copy-done={copied}
+        aria-label={copied
+          ? `Copied ${asset.symbol} token address`
+          : `Copy ${asset.symbol} token address ${asset.tokenAddress}`}
+        title={copied ? "Copied" : `Copy ${shortenAddress(asset.tokenAddress)}`}
+        onclick={copyToken}
+      >
+        {#if copied}
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"
+            ><path d="m3 8.5 3 3 7-7" /></svg
+          >
+        {:else}
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"
+            ><rect x="6" y="6" width="8" height="9" rx="1" /><path
+              d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14H6"
+            /></svg
+          >
+        {/if}
+      </button>
+    {/if}
     <button
       type="button"
-      draggable="false"
-      class="absolute right-2 top-2 z-10 px-1.5 font-mono text-[11px] text-ghost hover:text-stamp"
-      title="Drop {asset.symbol}"
-      aria-label="Drop {asset.symbol}"
-      onclick={(e) => {
-        e.stopPropagation();
-        onRemove();
-      }}
+      class="icon-button remove-button"
+      aria-label="Remove {asset.symbol}"
+      title="Remove {asset.symbol}"
+      onclick={onRemove}
     >
-      ×
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"
+        ><path d="m4 4 8 8M12 4l-8 8" /></svg
+      >
     </button>
-  {/if}
-  <div
-    class="flex h-full w-full cursor-grab flex-col p-3.5 pr-7 pl-7 text-left active:cursor-grabbing"
-    role="button"
-    tabindex="0"
-    onclick={click}
-    onkeydown={(e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        click();
-      }
+  </div>
+
+  <button
+    type="button"
+    class="card-content"
+    aria-label="View {asset.symbol} chart"
+    aria-pressed={active}
+    onclick={() => {
+      if (!dragged) onFocus();
     }}
   >
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <div class="font-display text-lg font-extrabold tracking-wide text-paper">
-          {asset.symbol}
-        </div>
-        <div class="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-ghost">
-          {asset.name}
-        </div>
+    <div class="asset-heading">
+      <AssetMark {asset} />
+      <div class="asset-identity">
+        <span class="asset-symbol">{asset.symbol}</span>
+        <span class="asset-name" title={asset.name}>{asset.name}</span>
       </div>
-      <span class="font-mono text-[10px] uppercase tracking-[0.22em] text-ghost">
-        {kindLabel(asset.kind)} · {sessionLabel(asset.kind)}
-      </span>
     </div>
 
-    <div class="mt-3 flex items-end justify-between gap-3">
-      <div>
-        <div
-          class="font-mono text-[26px] font-medium leading-none tabular {fresh
-            ? 'print-fresh'
-            : 'text-paper'}"
+    <div class="card-quote">
+      <div class="card-price tabular" class:print-fresh={fresh}>
+        {quote ? `$${formatPrice(quote.price)}` : "—"}
+      </div>
+      <div class="card-performance">
+        <span
+          class="change-badge tabular"
+          class:positive={quote && up}
+          class:negative={quote && !up}
         >
-          {quote ? `$${formatPrice(quote.price)}` : "—"}
-        </div>
-        <div
-          class="mt-1.5 font-mono text-[13px] tabular {up
-            ? 'text-copper'
-            : 'text-frost'}"
-        >
-          {up ? "▲" : "▼"}
+          {#if quote}<span aria-hidden="true">{up ? "↗" : "↘"}</span>{/if}
           {formatPct(quote?.changePct)}
-        </div>
-      </div>
-      <div class="w-[42%] min-w-24">
-        {#if spark.length >= 2}
-          <Sparkline points={spark} {up} />
-        {:else}
-          <div
-            class="flex h-9 items-end justify-end font-mono text-[10px] uppercase tracking-wider text-ghost"
-          >
-            collecting
-          </div>
-        {/if}
+        </span>
+        <span class="period-label"
+          >{asset.kind === "crypto" || asset.kind === "dex" ? "24h" : "session"}</span
+        >
       </div>
     </div>
 
-    {#if asset.kind === "dex" && windows}
-      <div
-        class="mt-3 grid grid-cols-4 gap-1 border-t border-rule pt-2 font-mono text-[10px] uppercase tracking-wider text-ghost"
+    <div class="card-spark">
+      {#if spark.length >= 2}
+        <Sparkline points={spark} {up} />
+      {:else}
+        <div class="spark-pending"><span>Awaiting price history</span></div>
+      {/if}
+    </div>
+
+    <div class="card-meta">
+      <span>{kindLabel(asset.kind)}</span>
+      {#if quote?.marketCap != null}
+        <span>MCap <b>${formatCompact(quote.marketCap)}</b></span>
+      {:else if quote?.volume != null}
+        <span>Vol <b>{formatCompact(quote.volume)}</b></span>
+      {:else}
+        <span
+          >{asset.kind === "crypto" || asset.kind === "dex"
+            ? "Always open"
+            : "US market"}</span
+        >
+      {/if}
+    </div>
+  </button>
+
+  {#if arranging}
+    <div class="reorder-controls">
+      <span class="tabular"
+        >{String(position + 1).padStart(2, "0")} / {String(total).padStart(
+          2,
+          "0",
+        )}</span
       >
-        {#each ["m5", "h1", "h6", "h24"] as key (key)}
-          {@const n = windows[key as "m5" | "h1" | "h6" | "h24"]}
-          <div>
-            <div>{key}</div>
-            <div class={(n ?? 0) >= 0 ? "text-copper" : "text-frost"}>
-              {formatPct(n)}
-            </div>
-          </div>
-        {/each}
+      <div class="flex gap-1">
+        <button
+          type="button"
+          class="icon-button"
+          disabled={position === 0}
+          aria-label="Move {asset.symbol} earlier"
+          title="Move earlier"
+          onclick={() => onMove(-1)}>←</button
+        >
+        <button
+          type="button"
+          class="icon-button"
+          disabled={position === total - 1}
+          aria-label="Move {asset.symbol} later"
+          title="Move later"
+          onclick={() => onMove(1)}>→</button
+        >
       </div>
-    {:else}
-      <div
-        class="mt-3 flex gap-4 border-t border-rule pt-2 font-mono text-[10px] uppercase tracking-wider text-ghost"
-      >
-        {#if quote?.marketCap != null}
-          <span>mcap {formatCompact(quote.marketCap)}</span>
-        {/if}
-        {#if quote?.volume != null}
-          <span>vol {formatCompact(quote.volume)}</span>
-        {/if}
-        {#if quote?.liquidity != null}
-          <span>liq {formatCompact(quote.liquidity)}</span>
-        {/if}
-        {#if quote?.dayLow != null && quote.dayHigh != null}
-          <span>{formatPrice(quote.dayLow)}–{formatPrice(quote.dayHigh)}</span>
-        {/if}
-        {#if quote}
-          <span class="ml-auto normal-case tracking-normal">{quote.source}</span>
-        {/if}
-      </div>
-    {/if}
-  </div>
+    </div>
+  {/if}
 </div>

@@ -31,8 +31,8 @@
       theme: "dark",
       style: "1",
       locale: "en",
-      backgroundColor: "#12151F",
-      gridColor: "rgba(42, 49, 72, 0.35)",
+      backgroundColor: "#121619",
+      gridColor: "rgba(42, 49, 53, 0.4)",
       hide_top_toolbar: false,
       allow_symbol_change: true,
       calendar: false,
@@ -61,7 +61,7 @@
     </div>
   {/if}
 {:else if asset.tradingView}
-  <div bind:this={box} class="h-full min-h-[280px] w-full"></div>
+  <div bind:this={box} class="h-full min-h-0 w-full"></div>
 {:else}
   <div class="flex h-full items-center justify-center font-mono text-xs text-ghost">
     No live chart for this name.

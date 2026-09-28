@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "night-tape",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-28",
+  "assets": {
+    "directory": "./build",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Page files are served free; only the feed proxy runs the Worker.
+    "run_worker_first": ["/api/*"],
+  },
+  // `wrangler dev` acts as if Access signed you in.
+  "access": {
+    "dev": { "aud": "night-tape-dev", "identity": { "email": "dev@localhost" } },
+  },
+  "vars": {
+    // Your Zero Trust team name: the <team> in <team>.cloudflareaccess.com.
+    "ACCESS_TEAM": "buildersofstuff",
+  },
+}

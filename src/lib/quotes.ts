@@ -1,5 +1,9 @@
 import type { Asset, Quote, Tick } from "./types";
 
+// Called straight from the browser (CoinGecko sends CORS headers). Through the
+// Worker it 429s: Cloudflare's shared outbound IPs exhaust the free per-IP limit.
+export const COINGECKO_API = "https://api.coingecko.com/api/v3";
+
 export type QuoteBatch = {
   quotes: Quote[];
   seeds: Record<string, Tick[]>;
@@ -44,7 +48,7 @@ async function fetchGecko(assets: Asset[], seed: boolean): Promise<QuoteBatch> {
 
   if (!seed) {
     const data = (await getJson(
-      `/api/coingecko/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`,
+      `${COINGECKO_API}/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`,
     )) as Record<string, Record<string, number>>;
     const quotes: Quote[] = [];
     for (const asset of list) {
@@ -68,7 +72,7 @@ async function fetchGecko(assets: Asset[], seed: boolean): Promise<QuoteBatch> {
   }
 
   const data = await getJson(
-    `/api/coingecko/coins/markets?vs_currency=usd&ids=${ids}&sparkline=true&price_change_percentage=1h,24h`,
+    `${COINGECKO_API}/coins/markets?vs_currency=usd&ids=${ids}&sparkline=true&price_change_percentage=1h,24h`,
   );
   if (!Array.isArray(data)) throw new Error("CoinGecko returned no markets");
   const byGecko = new Map(list.map((a) => [a.geckoId, a]));

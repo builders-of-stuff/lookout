@@ -1,16 +1,27 @@
 import {
   ALERT_COOLDOWN_MS,
   DEFAULT_ASSETS,
-  DEFAULT_IDS,
-  PINNED_IDS,
+  MOOD_POLL_MS,
   POLL_MS,
+  STORAGE_KEY,
 } from "./assets";
 import { formatPct, formatPrice } from "./format";
+import { fetchFearGreed } from "./fear-greed";
 import { fetchAllQuotes } from "./quotes";
 import { appendQuoteTick, loadDesk, mergeTicks, saveDesk, uid } from "./storage";
-import type { AlertEvent, AlertKind, AlertRule, Asset, Quote, Tick } from "./types";
+import type {
+  AlertEvent,
+  AlertKind,
+  AlertRule,
+  Asset,
+  DeskState,
+  FearGreedState,
+  Quote,
+  Tick,
+} from "./types";
 import { playTripChime } from "./chime";
-import { composeWatchlist, findOnDesk, sameAsset } from "./watchlist";
+import { startPoll } from "./poller";
+import { findOnDesk, sameAsset } from "./watchlist";
 
 function evaluate(
   quote: Quote,
@@ -60,49 +71,61 @@ function notifyBrowser(event: AlertEvent) {
   }
 }
 
-class Desk {
+export class Desk {
   quotes = $state<Record<string, Quote>>({});
   ticks = $state<Record<string, Tick[]>>({});
   rules = $state<AlertRule[]>([]);
   events = $state<AlertEvent[]>([]);
   focusId = $state("btc");
-  customAssets = $state<Asset[]>([]);
-  hiddenIds = $state<string[]>([]);
-  order = $state<string[]>([]);
+  assets = $state<Asset[]>([]);
+  saved = $state<boolean | null>(null);
   status = $state<"live" | "error" | "idle">("idle");
   errors = $state<string[]>([]);
   updatedAt = $state<number | null>(null);
   flashed = $state<Record<string, number>>({});
+  mood = $state<FearGreedState>({
+    crypto: null,
+    stocks: null,
+    errors: [],
+    updatedAt: null,
+  });
   seeded = false;
-  timer: ReturnType<typeof setInterval> | null = null;
-
-  assets = $derived(composeWatchlist(this.customAssets, this.hiddenIds, this.order));
+  stopPolls: (() => void) | null = null;
 
   constructor() {
-    const initial = loadDesk();
+    this.restore(loadDesk());
+  }
+
+  restore(initial: DeskState) {
     this.quotes = initial.quotes;
     this.ticks = initial.ticks;
     this.rules = initial.rules;
     this.events = initial.events;
     this.focusId = initial.focusId;
-    this.customAssets = initial.customAssets;
-    this.hiddenIds = initial.hiddenIds;
-    this.order = initial.order;
+    this.assets = initial.assets;
     this.updatedAt = Object.values(initial.quotes)[0]?.asOf ?? null;
+    if (!this.assets.length) {
+      this.status = "idle";
+      this.errors = [];
+    }
   }
 
   persist() {
-    saveDesk({
+    this.saved = saveDesk({
       quotes: this.quotes,
       ticks: this.ticks,
       rules: this.rules,
       events: this.events,
       focusId: this.focusId,
-      customAssets: this.customAssets,
-      hiddenIds: this.hiddenIds,
-      order: this.order,
+      assets: this.assets,
     });
   }
+
+  onStorage = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return;
+    this.restore(loadDesk());
+    this.saved = true;
+  };
 
   applyBatch(batch: Awaited<ReturnType<typeof fetchAllQuotes>>) {
     const flash: Record<string, number> = {};
@@ -137,10 +160,29 @@ class Desk {
     this.persist();
   }
 
+  async pollMood() {
+    try {
+      this.mood = await fetchFearGreed();
+    } catch (err) {
+      this.mood = {
+        crypto: this.mood.crypto,
+        stocks: this.mood.stocks,
+        errors: [err instanceof Error ? err.message : "Fear & greed failed"],
+        updatedAt: this.mood.updatedAt,
+      };
+    }
+  }
+
   async poll() {
+    if (!this.assets.length) {
+      this.status = "idle";
+      this.errors = [];
+      return;
+    }
     try {
       const seed = !this.seeded;
       const batch = await fetchAllQuotes(this.assets, seed);
+      if (!this.assets.length) return;
       if (seed && batch.quotes.length) this.seeded = true;
       if (!batch.quotes.length) {
         this.status = "error";
@@ -158,18 +200,26 @@ class Desk {
   }
 
   start() {
-    void this.poll();
-    this.timer = setInterval(() => void this.poll(), POLL_MS);
+    if (this.stopPolls) return;
+    // Freeze the first-visit defaults (or legacy migration) even if feeds fail.
+    this.persist();
+    window.addEventListener("storage", this.onStorage);
+    const stopQuotes = startPoll(() => void this.poll(), POLL_MS);
+    const stopMood = startPoll(() => void this.pollMood(), MOOD_POLL_MS);
+    this.stopPolls = () => {
+      stopQuotes();
+      stopMood();
+    };
   }
 
   stop() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
+    window.removeEventListener("storage", this.onStorage);
+    this.stopPolls?.();
+    this.stopPolls = null;
   }
 
   setFocus(id: string) {
+    if (!this.assets.some((asset) => asset.id === id)) return;
     this.focusId = id;
     this.persist();
   }
@@ -180,54 +230,42 @@ class Desk {
       this.setFocus(existing.id);
       return existing.id;
     }
-    const defaultMatch = DEFAULT_ASSETS.find((d) => sameAsset(d, incoming));
-    if (defaultMatch) {
-      this.hiddenIds = this.hiddenIds.filter((id) => id !== defaultMatch.id);
-      this.setFocus(defaultMatch.id);
-      return defaultMatch.id;
-    }
-    this.customAssets = [...this.customAssets, incoming];
-    this.order = [...this.assets.map((a) => a.id)];
-    this.focusId = incoming.id;
+    const asset = DEFAULT_ASSETS.find((d) => sameAsset(d, incoming)) ?? incoming;
+    this.assets = [...this.assets, asset];
+    this.focusId = asset.id;
     this.persist();
     try {
-      const batch = await fetchAllQuotes([incoming], true);
+      const batch = await fetchAllQuotes([asset], true);
       this.applyBatch(batch);
       if (batch.quotes.length) this.updatedAt = Date.now();
     } catch {
       // Next poll will retry.
     }
-    return incoming.id;
+    return asset.id;
   }
 
   removeAsset(id: string) {
-    if (PINNED_IDS.has(id)) return;
-    if (this.assets.length <= 1) return;
-    const remaining = this.assets.filter((a) => a.id !== id);
-    if (DEFAULT_IDS.has(id)) {
-      this.hiddenIds = this.hiddenIds.includes(id)
-        ? this.hiddenIds
-        : [...this.hiddenIds, id];
-    } else {
-      this.customAssets = this.customAssets.filter((a) => a.id !== id);
-    }
-    this.order = this.order.filter((item) => item !== id);
+    this.assets = this.assets.filter((a) => a.id !== id);
     if (this.focusId === id) {
-      this.focusId = remaining[0]?.id ?? this.focusId;
+      this.focusId = this.assets[0]?.id ?? "";
     }
     this.rules = this.rules.filter((r) => r.assetId !== id);
+    if (!this.assets.length) {
+      this.status = "idle";
+      this.errors = [];
+    }
     this.persist();
   }
 
   moveAsset(fromId: string, toId: string) {
     if (fromId === toId) return;
-    const ids = this.assets.map((a) => a.id);
-    const from = ids.indexOf(fromId);
-    const to = ids.indexOf(toId);
+    const next = [...this.assets];
+    const from = next.findIndex((asset) => asset.id === fromId);
+    const to = next.findIndex((asset) => asset.id === toId);
     if (from < 0 || to < 0) return;
-    ids.splice(from, 1);
-    ids.splice(to, 0, fromId);
-    this.order = ids;
+    const [asset] = next.splice(from, 1);
+    next.splice(to, 0, asset);
+    this.assets = next;
     this.persist();
   }
 
