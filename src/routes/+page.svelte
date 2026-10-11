@@ -13,7 +13,9 @@
   import { POLL_MS } from "$lib/assets";
   import { playTripChime, unlockChime } from "$lib/chime";
   import { formatClock, formatCompact, formatTime, usSession } from "$lib/format";
-  import { onMount } from "svelte";
+  import type { Asset } from "$lib/types";
+  import { onMount, tick } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
 
   let now = $state(Date.now());
   let notify = $state(
@@ -26,6 +28,8 @@
   let draggingId = $state<string | null>(null);
   let overId = $state<string | null>(null);
   let announcement = $state("");
+  // Below this width the details pane opens inline under the tapped card's row.
+  const compact = new MediaQuery("(max-width: 1099px)");
 
   const focus = $derived(
     desk.assets.find((a) => a.id === desk.focusId) ?? desk.assets[0],
@@ -56,8 +60,15 @@
     detailsOpen = true;
   }
 
-  function closeDetails() {
+  async function closeDetails() {
+    if (!detailsOpen) return;
     detailsOpen = false;
+    if (!compact.current || !focus) return;
+    const id = focus.id;
+    await tick();
+    document
+      .querySelector(`[data-asset-id="${CSS.escape(id)}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   onMount(() => {
@@ -181,8 +192,8 @@
   {/if}
 
   <div class="workspace">
-    <MoodRail mood={desk.mood} />
     <WeatherRail {station} {now} />
+    <MoodRail mood={desk.mood} />
 
     <div class="workspace-toolbar">
       <div>
@@ -265,6 +276,22 @@
       </details>
     {/if}
 
+    {#snippet details(asset: Asset)}
+      <FocusPane
+        {asset}
+        quote={desk.quotes[asset.id]}
+        ticks={desk.ticks[asset.id] ?? []}
+        rules={desk.rules}
+        onAddRule={(kind, value) => desk.addRule(asset.id, kind, value)}
+        onRemoveRule={(id) => desk.removeRule(id)}
+        onDrop={() => {
+          desk.removeAsset(asset.id);
+          if (!desk.assets.length) detailsOpen = false;
+        }}
+        onClose={closeDetails}
+      />
+    {/snippet}
+
     <main
       class="desk-grid"
       class:with-details={detailsOpen && !!focus}
@@ -300,6 +327,9 @@
               overId = null;
             }}
           />
+          {#if compact.current && detailsOpen && focus?.id === asset.id}
+            {@render details(asset)}
+          {/if}
         {:else}
           <div class="empty-watchlist">
             <div class="empty-mark" aria-hidden="true">＋</div>
@@ -315,20 +345,8 @@
           </div>
         {/each}
       </section>
-      {#if detailsOpen && focus}
-        <FocusPane
-          asset={focus}
-          quote={desk.quotes[focus.id]}
-          ticks={desk.ticks[focus.id] ?? []}
-          rules={desk.rules}
-          onAddRule={(kind, value) => desk.addRule(focus.id, kind, value)}
-          onRemoveRule={(id) => desk.removeRule(id)}
-          onDrop={() => {
-            desk.removeAsset(focus.id);
-            if (!desk.assets.length) detailsOpen = false;
-          }}
-          onClose={closeDetails}
-        />
+      {#if !compact.current && detailsOpen && focus}
+        {@render details(focus)}
       {/if}
     </main>
 

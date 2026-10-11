@@ -2381,10 +2381,12 @@ button:disabled {
   .watchlist-grid,
   .with-details .watchlist-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row dense;
   }
   .focus-pane {
+    grid-column: 1 / -1;
     position: static;
-    order: -1;
+    scroll-margin-top: 12px;
     height: auto;
     max-height: none;
     overflow: visible;

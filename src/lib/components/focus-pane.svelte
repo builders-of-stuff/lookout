@@ -56,7 +56,9 @@
     if (!el || typeof window === "undefined") return;
     const frame = window.requestAnimationFrame(() => {
       const rect = el.getBoundingClientRect();
-      if (rect.top > 48) el.scrollIntoView({ block: "start", behavior: "smooth" });
+      if (rect.top < 0 || rect.top > 48) {
+        el.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
     });
     return () => window.cancelAnimationFrame(frame);
   });
