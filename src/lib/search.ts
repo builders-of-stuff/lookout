@@ -1,6 +1,6 @@
 import { DEFAULT_ASSETS, tv } from "./assets";
 import { trackedFetch } from "./feed-log.svelte";
-import { COINGECKO_API } from "./quotes";
+import { COINGECKO_API, PAPRIKA_API } from "./coins";
 import type { Asset } from "./types";
 
 export type SearchGroup = "coin" | "dex" | "stock";
@@ -43,31 +43,49 @@ async function getJson(url: string): Promise<unknown> {
   return res.json();
 }
 
-function geckoHit(row: Record<string, unknown>): SearchHit | null {
-  const id = String(row.id ?? "");
-  const symbol = String(row.symbol ?? "").toUpperCase();
-  const name = String(row.name ?? symbol);
+type CoinRow = {
+  id: string;
+  symbol: string;
+  name: string;
+  rank: unknown;
+  source: "CoinGecko" | "CoinPaprika";
+};
+
+function coinHit({ id, symbol, name, rank, source }: CoinRow): SearchHit | null {
   if (!id || !symbol) return null;
   const tvSymbol = `BINANCE:${symbol}USDT`;
+  const gecko = source === "CoinGecko";
   const asset: Asset = {
-    id: `gecko:${id}`,
+    id: gecko ? `gecko:${id}` : `paprika:${id}`,
     symbol,
     name,
     kind: "crypto",
-    geckoId: id,
+    ...(gecko ? { geckoId: id } : { paprikaId: id }),
     tradingView: tvSymbol,
     links: [
       { label: "TradingView", href: tv(tvSymbol) },
-      { label: "CMC", href: `https://coinmarketcap.com/currencies/${id}/` },
+      gecko
+        ? { label: "CMC", href: `https://coinmarketcap.com/currencies/${id}/` }
+        : { label: "CoinPaprika", href: `https://coinpaprika.com/coin/${id}/` },
       { label: "DexScreener", href: `https://dexscreener.com/search?q=${symbol}` },
     ],
   };
-  const rank = row.market_cap_rank;
   return {
     key: asset.id,
     group: "coin",
     asset,
-    detail: typeof rank === "number" ? `mcap #${rank}` : "CoinGecko",
+    detail: typeof rank === "number" ? `mcap #${rank}` : source,
+  };
+}
+
+function rowOf(row: Record<string, unknown>, source: CoinRow["source"]): CoinRow {
+  const symbol = String(row.symbol ?? "").toUpperCase();
+  return {
+    id: String(row.id ?? ""),
+    symbol,
+    name: String(row.name ?? symbol),
+    rank: source === "CoinGecko" ? row.market_cap_rank : row.rank,
+    source,
   };
 }
 
@@ -169,12 +187,22 @@ function tickerFallback(raw: string): SearchHit {
 }
 
 async function searchCoins(query: string): Promise<SearchHit[]> {
-  const data = (await getJson(
-    `${COINGECKO_API}/search?query=${encodeURIComponent(query)}`,
-  )) as { coins?: Array<Record<string, unknown>> };
-  return (data.coins ?? [])
+  const q = encodeURIComponent(query);
+  let rows: CoinRow[];
+  try {
+    const data = (await getJson(`${COINGECKO_API}/search?query=${q}`)) as {
+      coins?: Array<Record<string, unknown>>;
+    };
+    rows = (data.coins ?? []).map((row) => rowOf(row, "CoinGecko"));
+  } catch {
+    const data = (await getJson(
+      `${PAPRIKA_API}/search?q=${q}&c=currencies&limit=6`,
+    )) as { currencies?: Array<Record<string, unknown>> };
+    rows = (data.currencies ?? []).map((row) => rowOf(row, "CoinPaprika"));
+  }
+  return rows
     .slice(0, 6)
-    .map(geckoHit)
+    .map(coinHit)
     .filter((h): h is SearchHit => h !== null);
 }
 

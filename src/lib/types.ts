@@ -11,6 +11,8 @@ export type Asset = {
   name: string;
   kind: AssetKind;
   geckoId?: string;
+  // Coins found through CoinPaprika's search, when CoinGecko's fails.
+  paprikaId?: string;
   yahooSymbol?: string;
   cnbcSymbol?: string;
   tokenAddress?: string;

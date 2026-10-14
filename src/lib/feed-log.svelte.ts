@@ -22,7 +22,11 @@ const WORKER_FEEDS: Record<string, string> = {
 };
 
 const DIRECT_FEEDS: Record<string, string> = {
+  "data-api.binance.vision": "Binance",
+  "api.exchange.coinbase.com": "Coinbase",
+  "api.kraken.com": "Kraken",
   "api.coingecko.com": "CoinGecko",
+  "api.coinpaprika.com": "CoinPaprika",
   "api.open-meteo.com": "Open-Meteo forecast",
   "air-quality-api.open-meteo.com": "Open-Meteo air quality",
   "geocoding-api.open-meteo.com": "Open-Meteo city search",

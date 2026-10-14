@@ -26,6 +26,16 @@ function spxLike(asset: Asset): boolean {
 export function sameAsset(a: Asset, b: Asset): boolean {
   if (a.id === b.id) return true;
   if (a.geckoId && a.geckoId === b.geckoId) return true;
+  if (a.paprikaId && a.paprikaId === b.paprikaId) return true;
+  // The same coin found through CoinGecko on one visit and CoinPaprika on another.
+  if (
+    a.kind === "crypto" &&
+    b.kind === "crypto" &&
+    a.symbol === b.symbol &&
+    a.name.toLowerCase() === b.name.toLowerCase()
+  ) {
+    return true;
+  }
   if (
     a.tokenAddress &&
     b.tokenAddress &&

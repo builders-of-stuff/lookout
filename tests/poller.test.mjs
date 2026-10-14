@@ -5,7 +5,7 @@ import { createServer } from "vite";
 const server = await createServer({
   server: { middlewareMode: true, watch: null, ws: false },
 });
-const { startPoll } = await server.ssrLoadModule("/src/lib/poller.ts");
+const { pacer, startPoll } = await server.ssrLoadModule("/src/lib/poller.ts");
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
 
 let page;
@@ -90,4 +90,36 @@ test("a tab opened in the background waits until it is shown", () => {
   setHidden(false);
   assert.equal(runs, 1);
   stop();
+});
+
+const PACE = { everyMs: 60_000, retryMs: 2 * 60_000, maxMs: 16 * 60_000 };
+
+test("a pacer rests for the interval after a success", () => {
+  const pace = pacer(PACE);
+  assert.equal(pace.due(0), true);
+  pace.succeeded(0);
+  assert.equal(pace.due(59_999), false);
+  assert.equal(pace.resting(59_999), true);
+  assert.equal(pace.due(60_000), true);
+  assert.equal(pace.failing, false);
+});
+
+test("a pacer doubles its wait on each failure, up to the cap, and resets", () => {
+  const pace = pacer(PACE);
+  const waits = [];
+  let now = 0;
+  for (let i = 0; i < 6; i += 1) {
+    pace.failed(now);
+    waits.push(pace.nextAt - now);
+    now = pace.nextAt;
+  }
+  assert.deepEqual(
+    waits.map((ms) => ms / 60_000),
+    [2, 4, 8, 16, 16, 16],
+  );
+  assert.equal(pace.failing, true);
+  assert.equal(pace.resting(now - 1), false);
+  pace.succeeded(now);
+  assert.equal(pace.failing, false);
+  assert.equal(pace.nextAt, now + 60_000);
 });

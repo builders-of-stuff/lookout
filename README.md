@@ -13,11 +13,11 @@ Polling pauses while the tab is hidden. Coming back after a missed cycle refresh
 
 ## What's on the blotter
 
-| Name                    | Source      | Live chart                         |
-| ----------------------- | ----------- | ---------------------------------- |
-| BTC, ZEC, SOL, SUI, ETH | CoinGecko   | TradingView embed + outbound links |
-| ZCAT (Anonymous Cat)    | DexScreener | DexScreener embed                  |
-| TSLA, SPCX, S&P 500     | CNBC        | TradingView embed                  |
+| Name                    | Source                                                            | Live chart                         |
+| ----------------------- | ----------------------------------------------------------------- | ---------------------------------- |
+| BTC, ZEC, SOL, SUI, ETH | Binance, falling back to Coinbase, Kraken, CoinGecko, CoinPaprika | TradingView embed + outbound links |
+| ZCAT (Anonymous Cat)    | DexScreener                                                       | DexScreener embed                  |
+| TSLA, SPCX, S&P 500     | CNBC                                                              | TradingView embed                  |
 
 Short-term sparklines and the **Short tape** tab are built from seeded history plus every poll (20s), kept in `localStorage`. **Full chart** is the real TradingView advanced chart or the DexScreener pool chart.
 
@@ -31,21 +31,25 @@ Each bay links out to TradingView, DexScreener, CMC, Yahoo, or Solscan depending
 
 For this repo: **no.**
 
-| Feed                | Cost             | Notes                                                                                                                                                                                             |
-| ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CoinGecko Demo      | Free             | Majors. Called straight from the browser (CORS-open); a proxy would share Cloudflare's rate-limited IPs.                                                                                          |
-| DexScreener         | Free, no key     | ZCAT + any future meme.                                                                                                                                                                           |
-| GeckoTerminal       | Free             | ZCAT candles when the pool quotes USD-like prices.                                                                                                                                                |
-| CNBC quote feed     | Free, unofficial | Equities / SPX in one batched request.                                                                                                                                                            |
-| Alternative.me F&G  | Free, no key     | Crypto fear & greed, daily. Vite proxy.                                                                                                                                                           |
-| CNN Fear & Greed    | Free, unofficial | US stock sentiment plus the seven component readings. Vite proxy; needs a browser-like User-Agent.                                                                                                |
-| Yahoo chart API     | Free, unofficial | Optional 1-day seed for the stock short-tape. Ignored if Yahoo 429s.                                                                                                                              |
-| TradingView widgets | Free             | Same charts you already use. The licensed Charting Library is **not** used.                                                                                                                       |
-| Open-Meteo          | Free, no key     | Forecast and city search, plus a modelled air-quality estimate used only when no monitor is available. Called directly from the browser (CORS-open); free for non-commercial use, ~10k calls/day. |
-| Environment Canada  | Free, no key     | GeoMet API weather alerts for Canadian cities.                                                                                                                                                    |
-| WAQI (aqicn.org)    | Free token       | Measured AQI from official monitors (Air Quality Ontario for Toronto). Optional; the Vite proxy adds `WAQI_TOKEN` so it never reaches the browser. Non-commercial use.                            |
-| NWS (weather.gov)   | Free, no key     | Active watches, warnings, and advisories for US cities.                                                                                                                                           |
-| CoinMarketCap       | Not used         | Basic plan is free with a key (~10k credits/mo) but the key cannot sit in a browser app. A tiny proxy would be required. CoinGecko covers the same majors.                                        |
+| Feed                | Cost             | Notes                                                                                                                                                                                                              |
+| ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Binance market data | Free, no key     | First choice for coin prices, 24h change, and hourly candles. Called straight from the browser (CORS-open), like every coin feed. Binance blocks US IPs; the chain then moves on.                                  |
+| Coinbase Exchange   | Free, no key     | Next for coin prices and candles, one call per coin.                                                                                                                                                               |
+| Kraken              | Free, no key     | Third; one hourly-candle call per coin gives the price, the 24h change, and the chart.                                                                                                                             |
+| CoinGecko           | Free, no key     | Market cap, market-wide volume, and prices for coins no exchange lists. At most once a minute (its free data refreshes that often), backing off after failures. A proxy would share Cloudflare's rate-limited IPs. |
+| CoinPaprika         | Free, no key     | Last resort for coin prices and market cap, and for coin search when CoinGecko fails. 20,000 calls a month, so each coin is asked every 5 minutes at most.                                                         |
+| DexScreener         | Free, no key     | ZCAT + any future meme.                                                                                                                                                                                            |
+| GeckoTerminal       | Free             | ZCAT candles when the pool quotes USD-like prices.                                                                                                                                                                 |
+| CNBC quote feed     | Free, unofficial | Equities / SPX in one batched request.                                                                                                                                                                             |
+| Alternative.me F&G  | Free, no key     | Crypto fear & greed, daily. Vite proxy.                                                                                                                                                                            |
+| CNN Fear & Greed    | Free, unofficial | US stock sentiment plus the seven component readings. Vite proxy; needs a browser-like User-Agent.                                                                                                                 |
+| Yahoo chart API     | Free, unofficial | Optional 1-day seed for the stock short-tape. Ignored if Yahoo 429s.                                                                                                                                               |
+| TradingView widgets | Free             | Same charts you already use. The licensed Charting Library is **not** used.                                                                                                                                        |
+| Open-Meteo          | Free, no key     | Forecast and city search, plus a modelled air-quality estimate used only when no monitor is available. Called directly from the browser (CORS-open); free for non-commercial use, ~10k calls/day.                  |
+| Environment Canada  | Free, no key     | GeoMet API weather alerts for Canadian cities.                                                                                                                                                                     |
+| WAQI (aqicn.org)    | Free token       | Measured AQI from official monitors (Air Quality Ontario for Toronto). Optional; the Vite proxy adds `WAQI_TOKEN` so it never reaches the browser. Non-commercial use.                                             |
+| NWS (weather.gov)   | Free, no key     | Active watches, warnings, and advisories for US cities.                                                                                                                                                            |
+| CoinMarketCap       | Not used         | Basic plan is free with a key (~10k credits/mo) but the key cannot sit in a browser app. A tiny proxy would be required. CoinGecko covers the same majors.                                                         |
 
 Paid upgrades only if you outgrow this: CMC Pro, Polygon / Twelve Data for stocks, TradingView Charting Library for a white-label TV clone.
 
@@ -64,7 +68,7 @@ To try the Worker build locally, `pnpm run preview:worker` (port 8787). The `acc
 
 **Feeds** in the header lists each feed's last call from this tab, whether it went through the Worker or direct, and its status. It also shows today's Worker requests against the free plan's 100,000 (per account, reset at midnight UTC). The usage meter needs a Cloudflare API token with **Account → Account Analytics → Read**: put `ANALYTICS_TOKEN=…` and `ANALYTICS_ACCOUNT_ID=…` in `.env.local` for `pnpm dev`, and store both online with `pnpm exec wrangler secret put ANALYTICS_TOKEN` and `… ANALYTICS_ACCOUNT_ID`.
 
-Free-plan budget: 100,000 Worker requests a day. The default desk makes 2 per 20-second poll (CoinGecko goes direct), so roughly 8,600 for a tab left visible all day.
+Free-plan budget: 100,000 Worker requests a day. The default desk makes 2 per 20-second poll (the coin feeds go direct), so roughly 8,600 for a tab left visible all day.
 
 ## Weather
 
@@ -87,9 +91,9 @@ Arm a tripwire on the focused name: price above, price below, or session move �
 
 ## Add a name
 
-Use the watchlist search (`/` to focus). It hunts CoinGecko, DexScreener, and Yahoo at once:
+Use the watchlist search (`/` to focus). It hunts CoinGecko (or CoinPaprika when CoinGecko fails), DexScreener, and Yahoo at once:
 
-- Coins → CoinGecko + TradingView
+- Coins → CoinGecko or CoinPaprika + TradingView
 - Memes / mint addresses → DexScreener
 - Tickers (NVDA, SPY, `BRK-B`) → CNBC quotes + TradingView
 

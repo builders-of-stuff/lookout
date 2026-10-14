@@ -185,8 +185,10 @@ export class Desk {
       if (!this.assets.length) return;
       if (seed && batch.quotes.length) this.seeded = true;
       if (!batch.quotes.length) {
+        // Nothing was due: the slower coin feeds wait their turn between calls.
+        if (!batch.errors.length) return;
         this.status = "error";
-        this.errors = batch.errors.length ? batch.errors : ["No quotes returned"];
+        this.errors = batch.errors;
         return;
       }
       this.applyBatch(batch);

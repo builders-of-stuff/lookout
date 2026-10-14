@@ -27,3 +27,39 @@ export function startPoll(task: () => void, everyMs: number): () => void {
     document.removeEventListener("visibilitychange", schedule);
   };
 }
+
+export type PacerOptions = {
+  // Wait after a success. Zero calls again on the next poll.
+  everyMs: number;
+  // Wait after the first failure in a row; each further failure doubles it.
+  retryMs: number;
+  maxMs: number;
+};
+
+export type Pacer = ReturnType<typeof pacer>;
+
+// Paces calls to a feed with a tight rate limit or a habit of failing, so a
+// feed that is refusing this tab hears from it less and less often.
+export function pacer({ everyMs, retryMs, maxMs }: PacerOptions) {
+  let nextAt = 0;
+  let failures = 0;
+  return {
+    get nextAt() {
+      return nextAt;
+    },
+    get failing() {
+      return failures > 0;
+    },
+    due: (now = Date.now()) => now >= nextAt,
+    // Not due yet only because the last call succeeded recently.
+    resting: (now = Date.now()) => now < nextAt && failures === 0,
+    succeeded(now = Date.now()) {
+      failures = 0;
+      nextAt = now + everyMs;
+    },
+    failed(now = Date.now()) {
+      failures += 1;
+      nextAt = now + Math.min(retryMs * 2 ** (failures - 1), maxMs);
+    },
+  };
+}

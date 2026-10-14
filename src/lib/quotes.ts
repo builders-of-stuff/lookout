@@ -1,9 +1,6 @@
+import { fetchCoins } from "./coins";
 import { trackedFetch } from "./feed-log.svelte";
 import type { Asset, Quote, Tick } from "./types";
-
-// Called straight from the browser (CoinGecko sends CORS headers). Through the
-// Worker it 429s: Cloudflare's shared outbound IPs exhaust the free per-IP limit.
-export const COINGECKO_API = "https://api.coingecko.com/api/v3";
 
 export type QuoteBatch = {
   quotes: Quote[];
@@ -30,80 +27,6 @@ async function getJson(url: string): Promise<unknown> {
   const res = await trackedFetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.json();
-}
-
-function sparkToTicks(prices: number[] | undefined): Tick[] {
-  if (!prices?.length) return [];
-  const now = Date.now();
-  const step = 60 * 60 * 1000;
-  return prices.map((p, i) => ({
-    t: now - (prices.length - 1 - i) * step,
-    p,
-  }));
-}
-
-async function fetchGecko(assets: Asset[], seed: boolean): Promise<QuoteBatch> {
-  const list = assets.filter((a) => a.geckoId);
-  const ids = list.map((a) => a.geckoId).join(",");
-  if (!ids) return { quotes: [], seeds: {}, errors: [] };
-
-  if (!seed) {
-    const data = (await getJson(
-      `${COINGECKO_API}/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`,
-    )) as Record<string, Record<string, number>>;
-    const quotes: Quote[] = [];
-    for (const asset of list) {
-      const row = data[asset.geckoId ?? ""];
-      const price = num(row?.usd);
-      if (price == null) continue;
-      const changePct = num(row.usd_24h_change) ?? 0;
-      quotes.push({
-        id: asset.id,
-        price,
-        changePct,
-        changeAbs: price * (changePct / 100),
-        marketCap: num(row.usd_market_cap),
-        volume: num(row.usd_24h_vol),
-        windows: { h24: changePct },
-        source: "CoinGecko",
-        asOf: Date.now(),
-      });
-    }
-    return { quotes, seeds: {}, errors: [] };
-  }
-
-  const data = await getJson(
-    `${COINGECKO_API}/coins/markets?vs_currency=usd&ids=${ids}&sparkline=true&price_change_percentage=1h,24h`,
-  );
-  if (!Array.isArray(data)) throw new Error("CoinGecko returned no markets");
-  const byGecko = new Map(list.map((a) => [a.geckoId, a]));
-  const quotes: Quote[] = [];
-  const seeds: Record<string, Tick[]> = {};
-  for (const row of data as Array<Record<string, unknown>>) {
-    const asset = byGecko.get(String(row.id ?? ""));
-    if (!asset) continue;
-    const price = num(row.current_price);
-    if (price == null) continue;
-    const changePct =
-      num(row.price_change_percentage_24h) ??
-      num(row.price_change_percentage_24h_in_currency) ??
-      0;
-    const h1 = num(row.price_change_percentage_1h_in_currency);
-    quotes.push({
-      id: asset.id,
-      price,
-      changePct,
-      changeAbs: price * (changePct / 100),
-      marketCap: num(row.market_cap),
-      volume: num(row.total_volume),
-      windows: { h1, h24: changePct },
-      source: "CoinGecko",
-      asOf: Date.now(),
-    });
-    const spark = (row.sparkline_in_7d as { price?: number[] } | undefined)?.price;
-    seeds[asset.id] = sparkToTicks(spark);
-  }
-  return { quotes, seeds, errors: [] };
 }
 
 type DexPair = {
@@ -265,11 +188,10 @@ export async function fetchAllQuotes(
   assets: Asset[],
   seed = false,
 ): Promise<QuoteBatch> {
-  const geckoAssets = assets.filter((a) => a.geckoId);
   const dexAssets = assets.filter((a) => a.kind === "dex");
   const equityAssets = assets.filter((a) => a.cnbcSymbol);
   const jobs: Array<Promise<QuoteBatch>> = [
-    fetchGecko(geckoAssets, seed),
+    fetchCoins(assets, seed),
     ...dexAssets.map((a) => fetchDex(a, seed)),
     fetchCnbc(equityAssets),
   ];
