@@ -143,10 +143,10 @@ button:disabled {
   gap: 28px;
 }
 .market-status {
-  display: flex;
+  display: grid;
+  grid-template-columns: 5px auto;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
   font-size: 11px;
   color: var(--color-ghost);
 }
@@ -167,10 +167,27 @@ button:disabled {
   box-shadow: 0 0 8px #e899982b;
 }
 .header-clock {
-  width: 100%;
-  padding-left: 13px;
+  grid-column: 2;
   font: 10px var(--font-mono);
   color: #a9b1ae;
+}
+.fx-rate {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font: 10px var(--font-mono);
+  color: var(--color-ghost);
+}
+.fx-stale {
+  opacity: 0.55;
+}
+.fx-rate b {
+  font-weight: 500;
+  color: var(--color-paper);
+}
+.fx-rate:hover b {
+  color: var(--color-copper);
 }
 .header-actions {
   display: flex;
@@ -2452,6 +2469,9 @@ button:disabled {
   }
   .header-clock {
     display: none;
+  }
+  .fx-rate {
+    font-size: 9px;
   }
   .header-actions .quiet-button {
     min-height: 28px;

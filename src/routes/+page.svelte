@@ -8,11 +8,18 @@
   import WeatherRail from "$lib/components/weather-rail.svelte";
   import { desk } from "$lib/desk.svelte";
   import { feedLog } from "$lib/feed-log.svelte";
+  import { fx } from "$lib/fx.svelte";
   import { quota } from "$lib/quota.svelte";
   import { station } from "$lib/weather-station.svelte";
   import { POLL_MS } from "$lib/assets";
   import { playTripChime, unlockChime } from "$lib/chime";
-  import { formatClock, formatCompact, formatTime, usSession } from "$lib/format";
+  import {
+    formatClock,
+    formatCompact,
+    formatPct,
+    formatTime,
+    usSession,
+  } from "$lib/format";
   import type { Asset } from "$lib/types";
   import { onMount, tick } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
@@ -49,6 +56,13 @@
   );
   const feedsSeen = $derived(Object.keys(feedLog).length > 0);
   const feedsFailing = $derived(Object.values(feedLog).some((feed) => !feed.ok));
+  const fxTitle = $derived.by(() => {
+    const usdCad = fx.usdCad;
+    const failed = fx.error ? `Couldn’t refresh: ${fx.error}.` : "";
+    if (!usdCad) return failed || "USD/CAD from CNBC";
+    const rate = `1 US dollar buys ${usdCad.rate.toFixed(4)} Canadian dollars.`;
+    return `${rate} CNBC, ${formatTime(usdCad.asOf)}. ${failed}`.trim();
+  });
   const toasts = $derived(desk.events.filter((e) => now - e.at < 10_000).slice(0, 3));
 
   function openDetails(id: string) {
@@ -75,6 +89,7 @@
     desk.start();
     station.start();
     quota.start();
+    fx.start();
     const unlock = () => unlockChime();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeDetails();
@@ -86,6 +101,7 @@
       desk.stop();
       station.stop();
       quota.stop();
+      fx.stop();
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", onKey);
       clearInterval(id);
@@ -143,6 +159,25 @@
         <span class="status-dot" class:status-open={session === "rth"}></span>
         <span>{sessionNames[session]}</span>
         <span class="header-clock tabular">{formatClock(now)}</span>
+        <a
+          class="fx-rate tabular"
+          class:fx-stale={!!fx.error}
+          href="https://www.cnbc.com/quotes/CAD="
+          target="_blank"
+          rel="noreferrer"
+          title={fxTitle}
+        >
+          <span>USD/CAD</span>
+          {#if fx.usdCad}
+            {@const usdCad = fx.usdCad}
+            <b>{usdCad.rate.toFixed(4)}</b>
+            <span class:positive={usdCad.change > 0} class:negative={usdCad.change < 0}
+              >{formatPct(usdCad.changePct)}</span
+            >
+          {:else}
+            <b>—</b>
+          {/if}
+        </a>
       </div>
       <div class="header-actions">
         {#if notify !== "granted" && notify !== "unsupported"}
